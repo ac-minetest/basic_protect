@@ -59,7 +59,7 @@ minetest.register_node("basic_protect:protector", {
 	on_punch = function(pos, node, puncher, pointed_thing) 
 		local meta = minetest.get_meta(pos);local owner = meta:get_string("owner");
 		if owner == puncher:get_player_name() then
-			minetest.add_entity({x=pos.x+protector.radius/2,y=pos.y+protector.radius/2,z=pos.z+protector.radius/2}, "basic_protect:display")
+			minetest.add_entity({x=pos.x-0.5+protector.radius/2,y=pos.y-0.5+protector.radius/2,z=pos.z-0.5+protector.radius/2}, "basic_protect:display")
 		end
 	end
 });
@@ -70,7 +70,7 @@ minetest.register_entity("basic_protect:display", {
 	collisionbox = {0, 0, 0, 0, 0, 0},
 	visual = "wielditem",
 	-- wielditem seems to be scaled to 1.5 times original node size
-	visual_size = {x = 1.29*protector.radius/20, y = 1.29*protector.radius/20},
+	visual_size = {x = 1.29*protector.radius/21, y = 1.29*protector.radius/21},
 	textures = {"protector:display_node"},
 	timer = 0,
 
