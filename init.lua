@@ -3,11 +3,12 @@ local protector = {};
 protector.radius = 20; -- 20x20x20 area
 
 protector.cache = {};
+local round = math.floor;
 
 local old_is_protected = minetest.is_protected
 function minetest.is_protected(pos, digger)
 	local r = protector.radius;
-	local p = {x=math.floor((pos.x)/r)*r,y=math.floor((pos.y)/r)*r,z=math.floor((pos.z)/r)*r}
+	local p = {x=round(pos.x/r+0.5)*r,y=round(pos.y/r+0.5)*r,z=round(pos.z/r+0.5)*r}
 	
 	if not protector.cache[digger] then -- cache current check for faster future lookups
 		protector.cache[digger] = p;
@@ -44,23 +45,23 @@ minetest.register_node("basic_protect:protector", {
 		local pos = pointed_thing.under;
 		local name = placer:get_player_name();
 		local r = protector.radius;
-		local p = {x=math.floor((pos.x)/r)*r,y=math.floor((pos.y)/r)*r,z=math.floor((pos.z)/r)*r}
+		local p = {x=round(pos.x/r+0.5)*r,y=round(pos.y/r+0.5)*r,z=round(pos.z/r+0.5)*r}
 		if minetest.get_node(p).name == "basic_protect:protector" then
 			minetest.chat_send_player(name,"area already protected at " .. minetest.pos_to_string(p));
 			return nil
 		end
 		minetest.set_node(p, {name = "basic_protect:protector"});
 		local meta = minetest.get_meta(p);meta:set_string("owner",name);
-		minetest.chat_send_player(name, "#protector: protected new area (" .. p.x .. "," .. p.y .. "," .. p.z .. ") + " .. protector.radius-1 .. " nodes");
+		minetest.chat_send_player(name, "#protector: protected new area (" .. p.x .. "," .. p.y .. "," .. p.z .. ") + radius " .. 0.5*protector.radius .. " around");
 		meta:set_string("infotext", "property of " .. name);
 		protector.cache = {}; -- reset cache
 		itemstack:take_item(); return itemstack
 	end,
-	on_punch = function(pos, node, puncher, pointed_thing) 
-		local meta = minetest.get_meta(pos);local owner = meta:get_string("owner");
-		if owner == puncher:get_player_name() then
-			minetest.add_entity({x=pos.x-0.5+protector.radius/2,y=pos.y-0.5+protector.radius/2,z=pos.z-0.5+protector.radius/2}, "basic_protect:display")
-		end
+	on_punch = function(pos, node, puncher, pointed_thing) -- for unknown reason texture is unknown
+		-- local meta = minetest.get_meta(pos);local owner = meta:get_string("owner");
+		-- if owner == puncher:get_player_name() then
+			-- minetest.add_entity({x=pos.x-0.5,y=pos.y-0.5,z=pos.z-0.5}, "basic_protect:display")
+		-- end
 	end
 });
 
@@ -71,15 +72,11 @@ minetest.register_entity("basic_protect:display", {
 	visual = "wielditem",
 	-- wielditem seems to be scaled to 1.5 times original node size
 	visual_size = {x = 1.29*protector.radius/21, y = 1.29*protector.radius/21},
-	textures = {"protector:display_node"},
 	timer = 0,
 
 	on_activate = function(self, staticdata)
 		self.timer = 0;
-		-- Xanadu server only
-		if mobs and mobs.entity and mobs.entity == false then
-			self.object:remove()
-		end
+		self.object:set_properties({textures={"area_display.png"}})
 	end,
 
 	on_step = function(self, dtime)
