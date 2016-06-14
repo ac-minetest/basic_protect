@@ -17,7 +17,8 @@ function minetest.is_protected(pos, digger)
 		if (p0.x==p.x and p0.y==p.y and p0.z==p.z) then -- already checked, just lookup
 			return protector.cache[digger].is_protected 
 		else 
-			protector.cache[digger] = p; -- refresh cache
+			--minetest.chat_send_all(digger .. " " .. minetest.pos_to_string(p0) .. " : "  .. minetest.pos_to_string(p))
+			protector.cache[digger] = {x=p.x,y=p.y,z=p.z, is_protected = false}; -- refresh cache
 		end
 	end
 	
