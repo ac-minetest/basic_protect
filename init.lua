@@ -80,7 +80,7 @@ function minetest.is_protected(pos, digger)
 		end
 		
 		local player = minetest.get_player_by_name(digger);
-		if player and (tpos.x~=0 or tpos.y~=0 or tpos.z~=0) then
+		if player and (tpos.x~=p.x or tpos.y~=p.y or tpos.z~=p.z) then
 			player:setpos(tpos);
 		end
 	end
@@ -123,7 +123,7 @@ minetest.register_node("basic_protect:protector", {
 		minetest.set_node(pos, {name = "air"});
 		minetest.set_node(p, {name = "basic_protect:protector"});
 		local meta = minetest.get_meta(p);meta:set_string("owner",name);
-		minetest.chat_send_player(name, "#PROTECTOR: protected new area, protector placed at(" .. p.x .. "," .. p.y .. "," .. p.z .. ") + radius " .. 0.5*protector.radius .. " around, 2x more in vertical direction");
+		minetest.chat_send_player(name, "#PROTECTOR: protected new area, protector placed at(" .. p.x .. "," .. p.y .. "," .. p.z .. "), area size " .. protector.radius "x" .. protector.radius .. " , 2x more in vertical direction");
 		meta:set_string("infotext", "property of " .. name);
 		minetest.add_entity({x=p.x,y=p.y,z=p.z}, "basic_protect:display")
 		local shares = "";
@@ -133,8 +133,10 @@ minetest.register_node("basic_protect:protector", {
 	end,
 	
 	on_punch = function(pos, node, puncher, pointed_thing) -- for unknown reason texture is unknown
-		local meta = minetest.get_meta(pos);local owner = meta:get_string("owner");
-		if owner == puncher:get_player_name() then
+		local meta = minetest.get_meta(pos);
+		local owner = meta:get_string("owner");
+		local name = puncher:get_player_name();
+		if owner == name or minetest.is_protected(pos, name) then
 			minetest.add_entity({x=pos.x,y=pos.y,z=pos.z}, "basic_protect:display")
 		end
 	end,
@@ -224,12 +226,12 @@ minetest.register_entity("basic_protect:display", {
 	visual_size = {x = 1.0 / 1.5, y = 1.0 / 1.5},
 	textures = {"basic_protect:display_node"},
 	timer = 0,
-
+	
 	on_step = function(self, dtime)
 
 		self.timer = self.timer + dtime
 
-		if self.timer > 20 then
+		if self.timer > 30 then
 			self.object:remove()
 		end
 	end,
