@@ -117,6 +117,8 @@ minetest.register_node("basic_protect:protector", {
 		if minetest.get_node(p).name == "basic_protect:protector" then
 			local meta = minetest.get_meta(p);
 			minetest.chat_send_player(name,"#PROTECTOR: protector already at " .. minetest.pos_to_string(p) .. ", owned by " .. meta:get_string("owner"));
+			local obj = minetest.add_entity({x=p.x,y=p.y,z=p.z}, "basic_protect:display");
+			local luaent = obj:get_luaentity();	luaent.timer = 5; -- just 5 seconds display
 			return nil
 		end
 		pos.y=pos.y+1;
@@ -140,7 +142,7 @@ minetest.register_node("basic_protect:protector", {
 		local meta = minetest.get_meta(pos);
 		local owner = meta:get_string("owner");
 		local name = puncher:get_player_name();
-		if owner == name or minetest.is_protected(pos, name) then
+		if owner == name or not minetest.is_protected(pos, name) then
 			minetest.add_entity({x=pos.x,y=pos.y,z=pos.z}, "basic_protect:display")
 		end
 	end,
@@ -229,13 +231,13 @@ minetest.register_entity("basic_protect:display", {
 	visual = "wielditem",
 	visual_size = {x = 1.0 / 1.5, y = 1.0 / 1.5},
 	textures = {"basic_protect:display_node"},
-	timer = 0,
+	timer = 30,
 	
 	on_step = function(self, dtime)
 
-		self.timer = self.timer + dtime
+		self.timer = self.timer - dtime
 
-		if self.timer > 30 then
+		if self.timer < 0 then
 			self.object:remove()
 		end
 	end,
