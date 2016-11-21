@@ -122,8 +122,12 @@ minetest.register_node("basic_protect:protector", {
 		pos.y=pos.y+1;
 		minetest.set_node(pos, {name = "air"});
 		minetest.set_node(p, {name = "basic_protect:protector"});
-		local meta = minetest.get_meta(p);meta:set_string("owner",name);
-		minetest.chat_send_player(name, "#PROTECTOR: protected new area, protector placed at(" .. p.x .. "," .. p.y .. "," .. p.z .. "), area size " .. protector.radius "x" .. protector.radius .. " , 2x more in vertical direction");
+		local meta = minetest.get_meta(p);
+		meta:set_string("owner",name);
+		meta:set_int("xt",p.x);meta:set_int("yt",p.y);meta:set_int("zt",p.z);
+		meta:set_string("tpos", "0 0 0");
+		
+		minetest.chat_send_player(name, "#PROTECTOR: protected new area, protector placed at(" .. p.x .. "," .. p.y .. "," .. p.z .. "), area size " .. protector.radius .. "x" .. protector.radius .. " , 2x more in vertical direction");
 		meta:set_string("infotext", "property of " .. name);
 		minetest.add_entity({x=p.x,y=p.y,z=p.z}, "basic_protect:display")
 		local shares = "";
