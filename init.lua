@@ -50,7 +50,11 @@ function minetest.is_protected(pos, digger)
 		if minetest.get_node(p).name == "basic_protect:protector" then 
 			is_protected = check_protector (p, digger)
 		else
-			is_protected = old_is_protected(pos, digger);
+			if minetest.get_node(p).name == "ignore" then 
+				is_protected=true
+			else
+				is_protected = old_is_protected(pos, digger);
+			end
 		end
 		protector.cache[digger] = {pos = {x=p.x,y=p.y,z=p.z}, is_protected = is_protected};
 	
@@ -60,12 +64,21 @@ function minetest.is_protected(pos, digger)
 		if (p0.x==p.x and p0.y==p.y and p0.z==p.z) then -- already checked, just lookup
 			is_protected = protector.cache[digger].is_protected;
 		else -- another block, we need to check again
+			
+			local updatecache = true;
 			if minetest.get_node(p).name == "basic_protect:protector" then 
 				is_protected = check_protector (p, digger)
 			else
-				is_protected = old_is_protected(pos, digger);
+				if minetest.get_node(p).name == "ignore" then  -- area not yet loaded
+					is_protected=true; updatecache = false;
+					minetest.chat_send_player(digger,"#PROTECTOR: chunk is not yet completely loaded");
+				else
+					is_protected = old_is_protected(pos, digger);
+				end
 			end
-			protector.cache[digger] = {pos = {x=p.x,y=p.y,z=p.z}, is_protected = is_protected}; -- refresh cache;
+			if updatecache then 
+				protector.cache[digger] = {pos = {x=p.x,y=p.y,z=p.z}, is_protected = is_protected}; -- refresh cache;
+			end
 		end
 	end
 
@@ -79,9 +92,12 @@ function minetest.is_protected(pos, digger)
 			tpos = {x=xt,y=yt,z=zt};
 		end
 		
-		local player = minetest.get_player_by_name(digger);
-		if player and (tpos.x~=p.x or tpos.y~=p.y or tpos.z~=p.z) then
-			player:setpos(tpos);
+		
+		if (tpos.x~=p.x or tpos.y~=p.y or tpos.z~=p.z) then
+			local player = minetest.get_player_by_name(digger);
+			if minetest.get_node(p).name == "basic_protect:protector" then
+				if player then player:setpos(tpos) end;
+			end
 		end
 	end
 	
@@ -92,13 +108,18 @@ local update_formspec = function(pos)
 	local meta = minetest.get_meta(pos);
 	local shares = meta:get_string("shares");
 	local tpos = meta:get_string("tpos");
+	--local subfree = meta:get_string("subfree");
+	--if subfree == "" then subfree = "0 0 0 0 0 0" end
+	
 	if tpos == "" then 
 		tpos = "0 0 0" 
 	end
 	meta:set_string("formspec",
 					"size[5,5]"..
+					"label[-0.25,-0.25; PROTECTOR]"..
 					"field[0.25,1;5,1;shares;Write in names of players you want to add in protection ;".. shares .."]"..
 					"field[0.25,2;5,1;tpos;where to teleport intruders - default 0 0 0 ;".. tpos .."]"..
+					--"field[0.25,3;5,1;subfree;specify free to dig sub area x1 y1 z1 x2 y2 z2 - default 0 0 0 0 0 0;".. subfree .."]"..
 					"button_exit[4,4.5;1,1;OK;OK]"
 					);
 end
@@ -128,10 +149,13 @@ minetest.register_node("basic_protect:protector", {
 		meta:set_string("owner",name);
 		meta:set_int("xt",p.x);meta:set_int("yt",p.y);meta:set_int("zt",p.z);
 		meta:set_string("tpos", "0 0 0");
+		meta:set_string("timestamp", minetest.get_gametime());
 		
 		minetest.chat_send_player(name, "#PROTECTOR: protected new area, protector placed at(" .. p.x .. "," .. p.y .. "," .. p.z .. "), area size " .. protector.radius .. "x" .. protector.radius .. " , 2x more in vertical direction");
 		meta:set_string("infotext", "property of " .. name);
-		minetest.add_entity({x=p.x,y=p.y,z=p.z}, "basic_protect:display")
+		if #minetest.get_objects_inside_radius(pos, 1)==0 then 
+			minetest.add_entity({x=p.x,y=p.y,z=p.z}, "basic_protect:display")
+		end
 		local shares = "";
 		update_formspec(p);
 		protector.cache = {}; -- reset cache
@@ -143,15 +167,40 @@ minetest.register_node("basic_protect:protector", {
 		local owner = meta:get_string("owner");
 		local name = puncher:get_player_name();
 		if owner == name or not minetest.is_protected(pos, name) then
-			minetest.add_entity({x=pos.x,y=pos.y,z=pos.z}, "basic_protect:display")
+			if #minetest.get_objects_inside_radius(pos, 1)==0 then 
+				minetest.add_entity({x=pos.x,y=pos.y,z=pos.z}, "basic_protect:display")
+			end
+		end
+	end,
+	
+	
+	on_use = function(itemstack, user, pointed_thing)
+		local ppos = pointed_thing.under;
+		if not ppos then return end
+		local pos = protector_position(ppos);
+		local meta = minetest.get_meta(pos);
+		local owner = meta:get_string("owner");
+		local name = user:get_player_name();
+		
+		if owner == name then
+			if #minetest.get_objects_inside_radius(pos, 1)==0 then 
+				minetest.add_entity({x=pos.x,y=pos.y,z=pos.z}, "basic_protect:display")
+			end
+			minetest.chat_send_player(name,"#PROTECTOR: this is your area, protector placed at(" .. pos.x .. "," .. pos.y .. "," .. pos.z);
+		elseif owner~=name and minetest.get_node(pos).name=="basic_protect:protector" then
+			minetest.chat_send_player(name,"#PROTECTOR: this area is owned by " .. owner .. ", protector placed at(" .. pos.x .. "," .. pos.y .. "," .. pos.z .. ")");
+		else
+			minetest.chat_send_player(name,"#PROTECTOR: this area is FREE. place protector to claim it. Center is at (" .. pos.x .. "," .. pos.y .. "," .. pos.z.. ")");
 		end
 	end,
 	
     on_receive_fields = function(pos, formname, fields, player)
 		local meta = minetest.get_meta(pos);
 		local owner = meta:get_string("owner");
+		local name = player:get_player_name();
+		local privs = minetest.get_player_privs(name);
 		
-		if owner~= player:get_player_name() then return end
+		if owner~= name and not privs.privs then return end
 		
 		if fields.OK then
 			if fields.shares then
