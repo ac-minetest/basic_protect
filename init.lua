@@ -71,7 +71,7 @@ function minetest.is_protected(pos, digger)
 			else
 				if minetest.get_node(p).name == "ignore" then  -- area not yet loaded
 					is_protected=true; updatecache = false;
-					minetest.chat_send_player(digger,"#PROTECTOR: chunk is not yet completely loaded");
+					minetest.chat_send_player(digger,"#PROTECTOR: chunk " .. p.x .. " " .. p.y .. " " .. p.z .. " is not yet completely loaded");
 				else
 					is_protected = old_is_protected(pos, digger);
 				end
@@ -151,7 +151,7 @@ minetest.register_node("basic_protect:protector", {
 		meta:set_string("tpos", "0 0 0");
 		meta:set_string("timestamp", minetest.get_gametime());
 		
-		minetest.chat_send_player(name, "#PROTECTOR: protected new area, protector placed at(" .. p.x .. "," .. p.y .. "," .. p.z .. "), area size " .. protector.radius .. "x" .. protector.radius .. " , 2x more in vertical direction");
+		minetest.chat_send_player(name, "#PROTECTOR: protected new area, protector placed at(" .. p.x .. "," .. p.y .. "," .. p.z .. "), area size " .. protector.radius .. "x" .. protector.radius .. " , 2x more in vertical direction. Say /unprotect to remove protector. ");
 		meta:set_string("infotext", "property of " .. name);
 		if #minetest.get_objects_inside_radius(pos, 1)==0 then 
 			minetest.add_entity({x=p.x,y=p.y,z=p.z}, "basic_protect:display")
@@ -186,13 +186,27 @@ minetest.register_node("basic_protect:protector", {
 			if #minetest.get_objects_inside_radius(pos, 1)==0 then 
 				minetest.add_entity({x=pos.x,y=pos.y,z=pos.z}, "basic_protect:display")
 			end
-			minetest.chat_send_player(name,"#PROTECTOR: this is your area, protector placed at(" .. pos.x .. "," .. pos.y .. "," .. pos.z);
+			minetest.chat_send_player(name,"#PROTECTOR: this is your area, protector placed at(" .. pos.x .. "," .. pos.y .. "," .. pos.z .. ". say /unprotect to unclaim area. ");
 		elseif owner~=name and minetest.get_node(pos).name=="basic_protect:protector" then
 			minetest.chat_send_player(name,"#PROTECTOR: this area is owned by " .. owner .. ", protector placed at(" .. pos.x .. "," .. pos.y .. "," .. pos.z .. ")");
 		else
 			minetest.chat_send_player(name,"#PROTECTOR: this area is FREE. place protector to claim it. Center is at (" .. pos.x .. "," .. pos.y .. "," .. pos.z.. ")");
 		end
 	end,
+	
+	mesecons = {effector = { 
+		action_on = function (pos, node,ttl) 
+			local meta = minetest.get_meta(pos);
+			meta:set_int("space",0)
+		end,
+		
+		action_off = function (pos, node,ttl) 
+			local meta = minetest.get_meta(pos);
+			meta:set_int("space",1)
+		end,
+		}
+	},
+	
 	
     on_receive_fields = function(pos, formname, fields, player)
 		local meta = minetest.get_meta(pos);
@@ -302,3 +316,28 @@ minetest.register_craft({
 		{"default:stone", "default:stone", "default:stone"}
 	}
 })
+
+
+minetest.register_chatcommand("unprotect", { 
+	description = "Unprotects current area",
+	privs = {
+		interact = true
+	},
+	func = function(name, param)
+		local privs = minetest.get_player_privs(name);
+		local player = minetest.get_player_by_name(name);
+		local pos = player:getpos();
+		local ppos = protector_position(pos);
+		
+		if minetest.get_node(ppos).name == "basic_protect:protector" then
+			local meta = minetest.get_meta(ppos);
+			local owner = meta:get_string("owner");
+			if owner == name then
+				minetest.set_node(ppos,{name = "air"});
+				local inv = player:get_inventory();
+				inv:add_item("main",ItemStack("basic_protect:protector"));
+				minetest.chat_send_player(name, "#PROTECTOR: area unprotected ");
+			end
+		end
+	end
+});
