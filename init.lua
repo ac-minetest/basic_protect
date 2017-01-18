@@ -5,15 +5,17 @@
 -- no slowdowns due to large protection radius or larger protector counts
 -- shared protection: just write players names in list, separated by spaces
 
-local protector = {};
-protector.radius = 20; -- by default protects 20x10x20 chunk, protector placed in center at positions that are multiplier of 20,20 (x,y,z)
+--local protector = {};
+basic_protect = {};
+basic_protect.radius = 20; -- by default protects 20x10x20 chunk, protector placed in center at positions that are multiplier of 20,20 (x,y,z)
 
 
 
-protector.cache = {};
+
+basic_protect.cache = {};
 local round = math.floor;
 local protector_position = function(pos) 
-	local r = protector.radius;
+	local r = basic_protect.radius;
 	local ry = 2*r;
 	return {x=round(pos.x/r+0.5)*r,y=round(pos.y/ry+0.5)*ry,z=round(pos.z/r+0.5)*r};
 end
@@ -45,7 +47,7 @@ function minetest.is_protected(pos, digger)
 	local p = protector_position(pos);
 	local is_protected = true;
 	
-	if not protector.cache[digger] then -- cache current check for faster future lookups
+	if not basic_protect.cache[digger] then -- cache current check for faster future lookups
 		
 		if minetest.get_node(p).name == "basic_protect:protector" then 
 			is_protected = check_protector (p, digger)
@@ -56,13 +58,13 @@ function minetest.is_protected(pos, digger)
 				is_protected = old_is_protected(pos, digger);
 			end
 		end
-		protector.cache[digger] = {pos = {x=p.x,y=p.y,z=p.z}, is_protected = is_protected};
+		basic_protect.cache[digger] = {pos = {x=p.x,y=p.y,z=p.z}, is_protected = is_protected};
 	
 	else -- look up cached result
 	
-		local p0 = protector.cache[digger].pos;
+		local p0 = basic_protect.cache[digger].pos;
 		if (p0.x==p.x and p0.y==p.y and p0.z==p.z) then -- already checked, just lookup
-			is_protected = protector.cache[digger].is_protected;
+			is_protected = basic_protect.cache[digger].is_protected;
 		else -- another block, we need to check again
 			
 			local updatecache = true;
@@ -77,7 +79,7 @@ function minetest.is_protected(pos, digger)
 				end
 			end
 			if updatecache then 
-				protector.cache[digger] = {pos = {x=p.x,y=p.y,z=p.z}, is_protected = is_protected}; -- refresh cache;
+				basic_protect.cache[digger] = {pos = {x=p.x,y=p.y,z=p.z}, is_protected = is_protected}; -- refresh cache;
 			end
 		end
 	end
@@ -85,7 +87,7 @@ function minetest.is_protected(pos, digger)
 	if is_protected then -- DEFINE action for trespassers here
 		
 		--teleport offender
-		local tpos = protector.cache[digger].tpos;
+		local tpos = basic_protect.cache[digger].tpos;
 		if not tpos then 
 			local meta = minetest.get_meta(p);
 			local xt = meta:get_int("xt"); local yt = meta:get_int("yt"); local zt = meta:get_int("zt");
@@ -124,16 +126,37 @@ local update_formspec = function(pos)
 					);
 end
 
+basic_protect.protect_new = function(p,name)	
+	local meta = minetest.get_meta(p);
+	meta:set_string("owner",name);
+	meta:set_int("xt",p.x);meta:set_int("yt",p.y);meta:set_int("zt",p.z);
+	meta:set_string("tpos", "0 0 0");
+	meta:set_string("timestamp", minetest.get_gametime());
+	
+	minetest.chat_send_player(name, "#PROTECTOR: protected new area, protector placed at(" .. p.x .. "," .. p.y .. "," .. p.z .. "), area size " .. basic_protect.radius .. "x" .. basic_protect.radius .. " , 2x more in vertical direction.  Say /unprotect to unclaim area.. ");
+	meta:set_string("infotext", "property of " .. name);
+	
+	if #minetest.get_objects_inside_radius(p, 1)==0 then 
+		minetest.add_entity({x=p.x,y=p.y,z=p.z}, "basic_protect:display")
+	end
+	local shares = "";
+	update_formspec(p);
+	basic_protect.cache = {}; -- reset cache
+end
+
 minetest.register_node("basic_protect:protector", {
-	description = "Protects a rectangle area of size " .. protector.radius,
-	tiles = {"basic_protector.png"},
+	description = "Protects a rectangle area of size " .. basic_protect.radius,
+	tiles = {"basic_protector.png","basic_protector_down.png","basic_protector_down.png","basic_protector_down.png","basic_protector_down.png","basic_protector_down.png"},
+	--drawtype = "allfaces",
+	--paramtype = "light",
+	param1=1,
 	groups = {oddly_breakable_by_hand=2},
 	sounds = default.node_sound_wood_defaults(),
 	on_place = function(itemstack, placer, pointed_thing)
 	--after_place_node = function(pos, placer)
 		local pos = pointed_thing.under;
 		local name = placer:get_player_name();
-		local r = protector.radius;
+		local r = basic_protect.radius;
 		local p = protector_position(pos);
 		if minetest.get_node(p).name == "basic_protect:protector" then
 			local meta = minetest.get_meta(p);
@@ -142,23 +165,12 @@ minetest.register_node("basic_protect:protector", {
 			local luaent = obj:get_luaentity();	luaent.timer = 5; -- just 5 seconds display
 			return nil
 		end
+		
+		minetest.set_node(p, {name = "basic_protect:protector"});
+		basic_protect.protect_new(p,name);
+		
 		pos.y=pos.y+1;
 		minetest.set_node(pos, {name = "air"});
-		minetest.set_node(p, {name = "basic_protect:protector"});
-		local meta = minetest.get_meta(p);
-		meta:set_string("owner",name);
-		meta:set_int("xt",p.x);meta:set_int("yt",p.y);meta:set_int("zt",p.z);
-		meta:set_string("tpos", "0 0 0");
-		meta:set_string("timestamp", minetest.get_gametime());
-		
-		minetest.chat_send_player(name, "#PROTECTOR: protected new area, protector placed at(" .. p.x .. "," .. p.y .. "," .. p.z .. "), area size " .. protector.radius .. "x" .. protector.radius .. " , 2x more in vertical direction. Say /unprotect to remove protector. ");
-		meta:set_string("infotext", "property of " .. name);
-		if #minetest.get_objects_inside_radius(pos, 1)==0 then 
-			minetest.add_entity({x=p.x,y=p.y,z=p.z}, "basic_protect:display")
-		end
-		local shares = "";
-		update_formspec(p);
-		protector.cache = {}; -- reset cache
 		itemstack:take_item(); return itemstack
 	end,
 	
@@ -219,7 +231,7 @@ minetest.register_node("basic_protect:protector", {
 		if fields.OK then
 			if fields.shares then
 				meta:set_string("shares",fields.shares);
-				protector.cache = {}
+				basic_protect.cache = {}
 			end
 			
 			if fields.tpos then
@@ -229,9 +241,9 @@ minetest.register_node("basic_protect:protector", {
 					words[#words+1] = tonumber(word) or 0
 				end
 				
-				local xt = (words[1] or 0); if math.abs(xt)>protector.radius then xt = 0 end
-				local yt = (words[2] or 0); if math.abs(yt)>protector.radius then yt = 0 end
-				local zt = (words[3] or 0); if math.abs(zt)>protector.radius then zt = 0 end
+				local xt = (words[1] or 0); if math.abs(xt)>basic_protect.radius then xt = 0 end
+				local yt = (words[2] or 0); if math.abs(yt)>basic_protect.radius then yt = 0 end
+				local zt = (words[3] or 0); if math.abs(zt)>basic_protect.radius then zt = 0 end
 				
 				meta:set_int("xt", xt+pos.x)
 				meta:set_int("yt", yt+pos.y)
@@ -255,7 +267,7 @@ minetest.register_node("basic_protect:protector", {
 
 -- entities used to display area when protector is punched
 
-local x = protector.radius/2;
+local x = basic_protect.radius/2;
 local y = 2*x;
 minetest.register_node("basic_protect:display_node", {
 	tiles = {"area_display.png"},
@@ -340,4 +352,38 @@ minetest.register_chatcommand("unprotect", {
 			end
 		end
 	end
-});
+})
+
+minetest.register_chatcommand("protect", { 
+	description = "Protects current area",
+	privs = {
+		interact = true
+	},
+	func = function(name, param)
+		local privs = minetest.get_player_privs(name);
+		local player = minetest.get_player_by_name(name);
+		if not player then return end
+		local pos = player:getpos();
+		local ppos = protector_position(pos);
+		
+		if minetest.get_node(ppos).name == "basic_protect:protector" then
+			local meta = minetest.get_meta(ppos);
+			local owner = meta:get_string("owner");
+			if owner == name then
+				if #minetest.get_objects_inside_radius(ppos, 1)==0 then 
+					minetest.add_entity({x=ppos.x,y=ppos.y,z=ppos.z}, "basic_protect:display")
+				end
+				minetest.chat_send_player(name,"#PROTECTOR: this is your area, protector placed at(" .. ppos.x .. "," .. ppos.y .. "," .. ppos.z .. "). say /unprotect to unclaim area. ");
+			end
+		else
+			local inv = player:get_inventory();
+			local item = ItemStack("basic_protect:protector");
+			if inv:contains_item("main",item) then
+				minetest.set_node(ppos,{name = "basic_protect:protector"})
+				basic_protect.protect_new(ppos,name);
+				inv:remove_item("main",item)
+
+			end
+		end
+	end
+})
