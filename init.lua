@@ -8,7 +8,7 @@
 --local protector = {};
 basic_protect = {};
 basic_protect.radius = 32; -- by default protects 20x10x20 chunk, protector placed in center at positions that are multiplier of 20,20 (x,y,z)
-local enable_craft = false;
+local enable_craft = true; -- enable crafting of protector
 
 
 -- GHOST TOWN: OLD AREAS SWAPPING
@@ -159,13 +159,9 @@ basic_protect.protect_new = function(p,name)
 		if dist>skyblock.islands_gap then 
 			local privs = minetest.get_player_privs(name);
 			if not privs.kick then 
-				local meta = minetest.get_meta(skypos);
-				local mstring = meta:get_string("infotext");
-				if string.find(mstring,"ISLAND") then -- tried to protect other island
-					minetest.chat_send_player(name, "#PROTECTOR: you can only protect empty space or your island or above it")
-					minetest.set_node(p,{name = "air"}) -- clear protector
-					return
-				end
+				minetest.chat_send_player(name, "#PROTECTOR: you can only protect empty space or your island or above it")
+				minetest.set_node(p,{name = "air"}) -- clear protector
+				return
 			end
 		end
 	end
@@ -202,7 +198,6 @@ minetest.register_node("basic_protect:protector", {
 	groups = {oddly_breakable_by_hand=2},
 	sounds = default.node_sound_wood_defaults(),
 	on_place = function(itemstack, placer, pointed_thing)
-	--after_place_node = function(pos, placer)
 		local pos = pointed_thing.under;
 		local name = placer:get_player_name();
 		local r = basic_protect.radius;
@@ -212,7 +207,7 @@ minetest.register_node("basic_protect:protector", {
 			minetest.chat_send_player(name,"#PROTECTOR: protector already at " .. minetest.pos_to_string(p) .. ", owned by " .. meta:get_string("owner"));
 			local obj = minetest.add_entity({x=p.x,y=p.y,z=p.z}, "basic_protect:display");
 			local luaent = obj:get_luaentity();	luaent.timer = 15; -- just 15 seconds display
-			return nil
+			return itemstack
 		end
 		
 		minetest.set_node(p, {name = "basic_protect:protector"});
